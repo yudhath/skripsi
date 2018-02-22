@@ -20,9 +20,9 @@ class UploadController extends Controller
 
 				// Image size must be < 2MB
 				if($file_size/1000 > 2000){
-					echo 'Image size more than 2MB.';
+					return redirect()->back()->with('error', ['Image size must not more than 2MB']);
 				}else{
-					echo 'Image have been uploaded<br>';
+					
 					$file_name = $file->getClientOriginalName();
 					$file_extension = $file->getClientOriginalExtension();
 					$file->move('query_images', $file_name);
@@ -33,19 +33,23 @@ class UploadController extends Controller
 
 					// $imgrey = imagecreatefromjpeg('query_images/'.$file_name);
 					
-					// imagefilter($imgrey, IMG_FILTER_GRAYSCALE);
+					// imagefilter($imgrey, IMG_FILTER_GAUSSIAN_BLUR);
 					// imagejpeg($imgrey, 'query_images/0kaybirdGREY.jpg');
 
 					// imagedestroy($imgrey);
+
 					$this->sobel_edge_detection($image_url,$file_name,$file_extension,$clean_file_name);
+					$this->canny_edge_detection($image_url,$file_name,$file_extension,$clean_file_name);
+
 					// $imrgb = imagecreatefromjpeg($image_url);
 					// $imgrey = imagecreatefromjpeg($image_url);
 					// $imgaussianblur = imagecreatefromjpeg($image_url);
+					return redirect()->back()->with('success', ['Image have been uploaded']);
 				}
 			}
 		}
 		else{
-			echo 'There is no image';
+			return redirect()->back()->with('error', ['There is no image']);
 		}
     }
 
@@ -58,12 +62,49 @@ class UploadController extends Controller
 	    return $red+$green+$blue;
 	}
 
+	public function RGBtoHSV($r, $g, $b) {
+		$r = $r/255.; // convert to range 0..1
+		$g = $g/255.;
+		$b = $b/255.;
+		$cols = array("r" => $r, "g" => $g, "b" => $b);
+		asort($cols, SORT_NUMERIC);
+		$min = key(array_slice($cols, 1)); // "r", "g" or "b"
+		$max = key(array_slice($cols, -1)); // "r", "g" or "b"
+		// hue
+		if($cols[$min] == $cols[$max]) {
+			$h = 0;
+		} else {
+			if($max == "r") {
+				$h = 60. * ( 0 + ( ($cols["g"]-$cols["b"]) / ($cols[$max]-$cols[$min]) ) );
+			} elseif ($max == "g") {
+				$h = 60. * ( 2 + ( ($cols["b"]-$cols["r"]) / ($cols[$max]-$cols[$min]) ) );
+			} elseif ($max == "b") {
+				$h = 60. * ( 4 + ( ($cols["r"]-$cols["g"]) / ($cols[$max]-$cols[$min]) ) );
+			}
+			if($h < 0) {
+				$h += 360;
+			}
+		}
+		// saturation
+		if($cols[$max] == 0) {
+			$s = 0;
+		} else {
+			$s = ( ($cols[$max]-$cols[$min])/$cols[$max] );
+			$s = $s * 255;
+		}
+		// lightness
+		$v = $cols[$max];
+		$v = $v * 255;
+		return(array($h, $s, $v));
+	}
+
 	public function sobel_edge_detection($image_url,$file_name,$file_extension,$clean_file_name){
 		// a butterfly image picked on flickr
 		// $source_image = "https://assets-a1.kompasiana.com/items/album/2016/08/09/kupu-kupu-57a95a61b17a61520786ca96.jpg";
 		 
 		// creating the image
 		$starting_img = imagecreatefromjpeg('query_images/'.$file_name);
+		
 		// for gaussian blur
 		imagefilter($starting_img,IMG_FILTER_GAUSSIAN_BLUR);
 		 
@@ -125,39 +166,38 @@ class UploadController extends Controller
 		imagedestroy($final);
 	}
 
-	public function RGBtoHSV($r, $g, $b) {
-		$r = $r/255.; // convert to range 0..1
-		$g = $g/255.;
-		$b = $b/255.;
-		$cols = array("r" => $r, "g" => $g, "b" => $b);
-		asort($cols, SORT_NUMERIC);
-		$min = key(array_slice($cols, 1)); // "r", "g" or "b"
-		$max = key(array_slice($cols, -1)); // "r", "g" or "b"
-		// hue
-		if($cols[$min] == $cols[$max]) {
-			$h = 0;
-		} else {
-			if($max == "r") {
-				$h = 60. * ( 0 + ( ($cols["g"]-$cols["b"]) / ($cols[$max]-$cols[$min]) ) );
-			} elseif ($max == "g") {
-				$h = 60. * ( 2 + ( ($cols["b"]-$cols["r"]) / ($cols[$max]-$cols[$min]) ) );
-			} elseif ($max == "b") {
-				$h = 60. * ( 4 + ( ($cols["r"]-$cols["g"]) / ($cols[$max]-$cols[$min]) ) );
-			}
-			if($h < 0) {
-				$h += 360;
+	public function canny_edge_detection($image_url,$file_name,$file_extension,$clean_file_name){
+		$dimensions = getimagesize($image_url);
+		$w = $dimensions[0]; // width
+		$h = $dimensions[1]; // height
+		$im = imagecreatefromjpeg('query_images/'.$file_name);
+		imagefilter($im,IMG_FILTER_GAUSSIAN_BLUR);
+		for($hi=0; $hi < $h; $hi++) {
+			for($wi=0; $wi < $w; $wi++) {
+				$rgb = imagecolorat($im, $wi, $hi);
+				$r = ($rgb >> 16) & 0xFF;
+				$g = ($rgb >> 8) & 0xFF;
+				$b = $rgb & 0xFF;
+				$hsv = $this->RGBtoHSV($r, $g, $b);
+				if($hi < $h-1) {
+					// compare pixel below with current pixel
+					$brgb = imagecolorat($im, $wi, $hi+1);
+					$br = ($brgb >> 16) & 0xFF;
+					$bg = ($brgb >> 8) & 0xFF;
+					$bb = $brgb & 0xFF;
+					$bhsv = $this->RGBtoHSV($br, $bg, $bb);
+					// if difference in hue is bigger than 20, make this pixel white (edge), otherwise black
+					if($bhsv[2]-$hsv[2] > 20) {
+						imagesetpixel($im, $wi, $hi, imagecolorallocate($im, 255, 255, 255));
+					} else {
+						imagesetpixel($im, $wi, $hi, imagecolorallocate($im, 0, 0, 0));
+					}
+					
+				}
 			}
 		}
-		// saturation
-		if($cols[$max] == 0) {
-			$s = 0;
-		} else {
-			$s = ( ($cols[$max]-$cols[$min])/$cols[$max] );
-			$s = $s * 255;
-		}
-		// lightness
-		$v = $cols[$max];
-		$v = $v * 255;
-		return(array($h, $s, $v));
+		// header('Content-Type: image/jpeg');
+		imagejpeg($im,'query_images/'.$clean_file_name."EDGECANNY.".$file_extension);
+		imagedestroy($im);
 	}
 }
