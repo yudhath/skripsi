@@ -41,6 +41,7 @@ class UploadController extends Controller
 
 					$this->sobel_edge_detection($image_url,$file_name,$file_extension,$clean_file_name);
 					$this->canny_edge_detection($image_url,$file_name,$file_extension,$clean_file_name);
+					$this->glcm_image($image_url,$file_name,$file_extension,$clean_file_name);
 
 					// $imrgb = imagecreatefromjpeg($image_url);
 					// $imgrey = imagecreatefromjpeg($image_url);
@@ -103,22 +104,22 @@ class UploadController extends Controller
 		// a butterfly image picked on flickr
 		// $source_image = "https://assets-a1.kompasiana.com/items/album/2016/08/09/kupu-kupu-57a95a61b17a61520786ca96.jpg";
 		 
-		// creating the image
+		##CREATE THE IMAGE
 		$starting_img = imagecreatefromjpeg('query_images/'.$file_name);
 		
-		// for gaussian blur
+		##APPLY GAUSSIAN BLUR IN IMAGE
 		imagefilter($starting_img,IMG_FILTER_GAUSSIAN_BLUR);
 		 
-		// getting image information (I need only width and height)
+		##GET IMAGE SIZE (WIDTH AND HEIGHT)
 		$im_data = getimagesize($image_url);
 		 
-		// this will be the final image, same width and height of the original
+		##this will be the final image, same width and height of the original
 		$final = imagecreatetruecolor($im_data[0],$im_data[1]);
 		 
-		// looping through ALL pixels!!
+		##LOOPING THROUGH ALL PIXEL
 		for($x=1;$x<$im_data[0]-1;$x++){
 		    for($y=1;$y<$im_data[1]-1;$y++){
-		        // getting gray value of all surrounding pixels
+		        ##GETTING GRAY VALUE OF ALL SURROUNDING PIXELS (ALL NEIGHBOUR)
 		        $pixel_up = $this->get_luminance(imagecolorat($starting_img,$x,$y-1));
 		        $pixel_down = $this->get_luminance(imagecolorat($starting_img,$x,$y+1)); 
 		        $pixel_left = $this->get_luminance(imagecolorat($starting_img,$x-1,$y));
@@ -128,19 +129,20 @@ class UploadController extends Controller
 		        $pixel_down_left = $this->get_luminance(imagecolorat($starting_img,$x-1,$y+1));
 		        $pixel_down_right = $this->get_luminance(imagecolorat($starting_img,$x+1,$y+1));
 		        
-		        // appliying convolution mask
+		        ##APPLYING CONVOLUTION MASK
 		        $conv_x = ($pixel_up_right+($pixel_right*2)+$pixel_down_right)-($pixel_up_left+($pixel_left*2)+$pixel_down_left);
 		        $conv_y = ($pixel_up_left+($pixel_up*2)+$pixel_up_right)-($pixel_down_left+($pixel_down*2)+$pixel_down_right);
 		        
 		        // calculating the distance
 		        // $gray = sqrt($conv_x*$conv_x+$conv_y+$conv_y);
-		        // applying Manhattan Distance
+
+		        ##APPLYING MANHATTAN DISTANCE
 		        $gray = abs($conv_x)+abs($conv_y);
 		        
-		        // inverting the distance not to get the negative image                
+		        ##inverting the distance not to get the negative image                
 		        $gray = 255-$gray;
 		        
-		        // adjusting distance if it's greater than 255 or less than zero (out of color range)
+		        ##adjusting distance if it's greater than 255 or less than zero (out of color range)
 		        if($gray > 255){
 		            $gray = 255;
 		        }
@@ -148,21 +150,21 @@ class UploadController extends Controller
 		            $gray = 0;
 		        }
 		        
-		        // creation of the new gray
+		        ##creation of the new gray
 		        $new_gray  = imagecolorallocate($final,(int)$gray,(int)$gray,(int)$gray);
 		        
-		        // adding the gray pixel to the new image        
+		        ##ADDING / SET THE GRAY PIXEL TO THE NEW IMAGE
 		        imagesetpixel($final,$x,$y,$new_gray);            
 		    }
 		}
 		 
-		// telling the browser we are going to output a jpeg image
+		##telling the browser we are going to output a jpeg image
 		// header('Content-Type: image/jpeg');
 		 
-		// creation of the final image
-		imagejpeg($final,'query_images/'.$clean_file_name."EDGESOBEL.".$file_extension);
+		##CREATION OF THE FINAL IMAGE
+		imagejpeg($final,'query_images/'.$clean_file_name."_EDGESOBEL.".$file_extension);
 		 
-		// freeing memory
+		##FREEING MEMORY
 		imagedestroy($starting_img);
 		imagedestroy($final);
 	}
@@ -198,7 +200,125 @@ class UploadController extends Controller
 			}
 		}
 		// header('Content-Type: image/jpeg');
-		imagejpeg($im,'query_images/'.$clean_file_name."EDGECANNY.".$file_extension);
+
+		##CREATION OF THE FINAL IMAGE
+		imagejpeg($im,'query_images/'.$clean_file_name."_EDGECANNY.".$file_extension);
+
+		##FREEING MEMORY
+		imagedestroy($im);
+	}
+
+	public function glcm_image($image_url,$file_name,$file_extension,$clean_file_name){
+		##GET IMAGE SIZE
+		$dimensions = getimagesize($image_url);
+		$width = $dimensions[0]; // width
+		$height = $dimensions[1]; // height
+
+		##CREATE THE IMAGE
+		$im = imagecreatefromjpeg('query_images/'.$file_name);
+		// imagefilter($im,IMG_FILTER_GRAYSCALE); // convert image color into grayscale
+
+		##INITIALIZE ARRAY
+		$original_image = Array();
+		$normalize_image = Array();
+		$glcm_0 = Array();
+		$glcm_0_tr = Array();
+		$glcm_45 = Array();
+		$glcm_45_tr = Array();
+		$glcm_90 = Array();
+		$glcm_90_tr = Array();
+		$glcm_135 = Array();
+		$glcm_135_tr = Array();
+
+		##CONVERT RGB IMAGE INTO GRAYCALE IMAGE
+		for($h = 0 ; $h < $height ; $h++){
+			for($w = 0 ; $w < $width ; $w++){
+				$rgb = imagecolorat($im,$w,$h);
+
+				$red   = ($rgb >> 16) & 0xFF;
+			    $green = ($rgb >> 8) & 0xFF;
+			    $blue  = $rgb & 0xFF;
+			    
+				$gray = round(($red + $green + $blue) / 3);
+
+				##INSERT GRAY COLOR PIXEL INTO ARRAY 2 DIMENSION
+				$original_image[$h][$w] = $gray;
+
+				##START NORMALIZE GRAY COLOR
+
+				/*
+				0   - 31  = 0
+				32  - 63  = 1
+				64  - 95  = 2
+				96  - 127 = 3
+				128 - 159 = 4
+				160 - 191 = 5
+				192 - 223 = 6
+				224 - 255 = 7
+				*/
+
+				if($gray < 32){
+					$normalize_image[$h][$w] = 0;
+				}else if($gray < 64){
+					$normalize_image[$h][$w] = 1;
+				}else if($gray < 96){
+					$normalize_image[$h][$w] = 2;
+				}else if($gray < 128){
+					$normalize_image[$h][$w] = 3;
+				}else if($gray < 160){
+					$normalize_image[$h][$w] = 4;
+				}else if($gray < 192){
+					$normalize_image[$h][$w] = 5;
+				}else if($gray < 224){
+					$normalize_image[$h][$w] = 6;
+				}else if($gray < 256){
+					$normalize_image[$h][$w] = 7;
+				}
+
+				##END NORMALIZE GRAY COLOR
+
+				##SET PIXEL FOR THE NEW GRAYSCALE IMAGE
+				imagesetpixel($im, $w, $h, imagecolorallocate($im, $gray, $gray, $gray));
+			}
+		}
+
+		##CONVERT INTO GLCM MATRICES
+		for($i = 0 ; $i < 8 ; $i++){
+			for($j = 0 ; $j < 8 ; $j++){
+				$count = 0;
+				##COUNTING THE MATRICES FOR 0 DEGREE GLCM
+				for($h = 0 ; $h < $height ; $h++){
+					for($w = 0 ; $w < $width ; $w++){
+						if($w < ($width-1)){
+							if($normalize_image[$h][$w] == $i && $normalize_image[$h][$w+1] == $j){
+								$count += 1;
+							}
+						}
+					}
+				}
+				$glcm_0[$i][$j] = $count;
+			}
+		}
+
+		
+		for($i = 0 ; $i < 8 ; $i++){
+			for($j = 0 ; $j < 8 ; $j++){
+				$glcm_0_tr[$j][$i] = $glcm_0[$i][$j];
+			}
+		}
+
+
+		// for($i = 0 ; $i < 8 ; $i++){
+		// 	for($j = 0 ; $j < 8 ; $j++){
+		// 		echo $glcm_0[$i][$j] . "&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp";
+		// 	}
+		// 	echo "<br>";
+		// }
+
+		##CREATION OF THE FINAL IMAGE
+		imagejpeg($im,'query_images/'.$clean_file_name.'_GRAYSCALE.'.$file_extension);
+
+		##FREEING MEMORY
 		imagedestroy($im);
 	}
 }
