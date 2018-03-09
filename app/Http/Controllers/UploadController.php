@@ -41,7 +41,7 @@ class UploadController extends Controller
 
 					$this->sobel_edge_detection($image_url,$file_name,$file_extension,$clean_file_name);
 					$this->canny_edge_detection($image_url,$file_name,$file_extension,$clean_file_name);
-					$this->glcm_image($image_url,$file_name,$file_extension,$clean_file_name);
+					return $this->glcm_image($image_url,$file_name,$file_extension,$clean_file_name);
 
 					// $imrgb = imagecreatefromjpeg($image_url);
 					// $imgrey = imagecreatefromjpeg($image_url);
@@ -222,13 +222,26 @@ class UploadController extends Controller
 		$original_image = Array();
 		$normalize_image = Array();
 		$glcm_0 = Array();
-		$glcm_0_tr = Array();
+		$glcm_0_tr = Array(); // transpose matrix array
+		$glcm_0_count = Array(); // Count Matrix glcm_0 and glcm_0_tr
+		$glcm_0_sum = 0;
+
 		$glcm_45 = Array();
 		$glcm_45_tr = Array();
+		$glcm_45_count = Array(); // Count Matrix glcm_45 and glcm_45_tr
+		$glcm_45_sum = 0;
+
 		$glcm_90 = Array();
 		$glcm_90_tr = Array();
+		$glcm_90_count = Array(); // Count Matrix glcm_90 and glcm_90_tr
+		$glcm_90_sum = 0;
+
 		$glcm_135 = Array();
 		$glcm_135_tr = Array();
+		$glcm_135_count = Array(); // Count Matrix glcm_135 and glcm_135_tr
+		$glcm_135_sum = 0;
+
+		$test = 0;
 
 		##CONVERT RGB IMAGE INTO GRAYCALE IMAGE
 		for($h = 0 ; $h < $height ; $h++){
@@ -244,7 +257,7 @@ class UploadController extends Controller
 				##INSERT GRAY COLOR PIXEL INTO ARRAY 2 DIMENSION
 				$original_image[$h][$w] = $gray;
 
-				##START NORMALIZE GRAY COLOR
+				##DIVIDE INTO 8 GRAY LEVEL
 
 				/*
 				0   - 31  = 0
@@ -300,10 +313,27 @@ class UploadController extends Controller
 			}
 		}
 
-		
+		// SET MATRIX TRANSPOSE FOR GLCM 0 DEGREE
 		for($i = 0 ; $i < 8 ; $i++){
 			for($j = 0 ; $j < 8 ; $j++){
 				$glcm_0_tr[$j][$i] = $glcm_0[$i][$j];
+			}
+		}
+
+		// COUNT MATRIX GLCM_0 and GLCM_0_tr 
+		for($i = 0 ; $i < 8 ; $i++){
+			for($j = 0 ; $j < 8 ; $j++){
+				$glcm_0_count[$i][$j] = $glcm_0[$i][$j] + $glcm_0_tr[$i][$j];
+				$glcm_0_sum += $glcm_0_count[$i][$j];
+			}
+		}
+
+		// SIMILARITY (Normalized GLCM of the image)
+		for($i = 0 ; $i < 8 ; $i++){
+			for($j = 0 ; $j < 8 ; $j++){
+				$glcm_0_count[$i][$j] /= $glcm_0_sum;
+				$glcm_0_count[$i][$j] = round($glcm_0_count[$i][$j], 2);
+				$test += $glcm_0_count[$i][$j]; // NORMALIZE
 			}
 		}
 
@@ -320,5 +350,20 @@ class UploadController extends Controller
 
 		##FREEING MEMORY
 		imagedestroy($im);
+
+		return $this->print_block($test);
 	}
+
+	public function print_block($data, $title="PRINT BLOCK") {
+        echo "<div style='margin:20px; padding:10px; border:1px solid #666; box-shadow:0px 0px 10px #ccc; border-radius:6px;'>";
+        echo "  <div style='padding:10px 5px; margin-bottom:10px; font-weight:bold; font-size:120%; border-bottom:1px solid #666'>".$title."</div>";
+        if(is_array($data) OR is_object($data)) {
+            echo "<pre>";
+            print_r($data);
+            echo "</pre>";
+        } else {
+            echo $data;
+        }
+        echo "</div>";
+    }
 }
