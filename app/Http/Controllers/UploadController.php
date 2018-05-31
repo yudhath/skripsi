@@ -24,15 +24,15 @@ class UploadController extends Controller
 				if($file_size/1000 > 2000){
 					return redirect()->back()->with('error', ['Image size must not more than 2MB']);
 				}else{
-					
+
+					$date = date("YmdHis");
 					$file_name = $file->getClientOriginalName();
 					$file_extension = $file->getClientOriginalExtension();
-					$file->move('query_images', $file_name);
-					$image_url = URL('/query_images') . '/' . $file_name;
-
 					$clean_file_name_temp = explode('.', $file_name);
 					$clean_file_name = $clean_file_name_temp[0];
-					
+					$file_name = $clean_file_name.$date.$file_extension;
+					$file->move('query_images', $file_name);
+					$image_url = URL('/query_images') . '/' . $file_name;
 
 					// $imgrey = imagecreatefromjpeg('query_images/'.$file_name);
 					
@@ -42,8 +42,14 @@ class UploadController extends Controller
 					// imagedestroy($imgrey);
 
 					// $this->sobel_edge_detection($image_url,$file_name,$file_extension,$clean_file_name);
-					// $this->canny_edge_detection($image_url,$file_name,$file_extension,$clean_file_name);
+					// return $this->canny_edge_detection($image_url,$file_name,$file_extension,$clean_file_name);
 
+					// return $color_features = $this->local_color_histogram($image_url,$file_name,$file_extension,$clean_file_name,'query_images/');
+
+
+					## START GLCM
+					//
+					
 					$texture_features = $this->glcm_image($image_url,$file_name,$file_extension,$clean_file_name,'query_images/');
 					$id_image_query = DB::table('image_query')->insertGetId(['image_path' => 'query_images/'.$file_name]);
 					DB::table('image_query_texture')->insert([
@@ -57,7 +63,7 @@ class UploadController extends Controller
 
 					$image_query_texture = DB::select('select image_query_texture.* from image_query_texture
 														JOIN image_query ON image_query.id = image_query_texture.id_image_query
-														WHERE image_query.image_path = "query_images/'.$file_name.'"');
+														WHERE image_query_texture.id_image_query = '.$id_image_query);
 					$image_data_texture = DB::select('select * from image_data_texture');
 
 					foreach ($image_data_texture as $value) {
@@ -89,7 +95,7 @@ class UploadController extends Controller
 					return view('result',[
 						'result' => $result_arr
 					]);
-
+					//
 					## INSERT DATABASE TRAINING IMAGE
 					// for ($i=1; $i <= 250; $i++) { 
 					// 	DB::table('image_data')->insert([
@@ -126,14 +132,14 @@ class UploadController extends Controller
 					// 	}
 						
 					// }
+					
+					## END GLCM
+
+					## START EDGE DETECTION
+
+					## END EDGE DETECTION
 
 
-
-
-
-					// $imrgb = imagecreatefromjpeg($image_url);
-					// $imgrey = imagecreatefromjpeg($image_url);
-					// $imgaussianblur = imagecreatefromjpeg($image_url);
 					return redirect()->back()->with('success', ['Image have been uploaded']);
 				}
 			}
@@ -143,13 +149,25 @@ class UploadController extends Controller
 		}
     }
 
-    // function to get the luminance value
+    // function to get the luminance value (intensitas warna)
 	public function get_luminance($pixel){
 	    $pixel = sprintf('%06x',$pixel);
 	    $red = hexdec(substr($pixel,0,2))*0.30;
 	    $green = hexdec(substr($pixel,2,2))*0.59;
 	    $blue = hexdec(substr($pixel,4))*0.11;
 	    return $red+$green+$blue;
+	}
+
+	public function convert_to_gray($pixel){
+	    $pixel = sprintf('%06x',$pixel);
+	    $red = hexdec(substr($pixel,0,2))*0.30;
+	    $green = hexdec(substr($pixel,2,2))*0.59;
+	    $blue = hexdec(substr($pixel,4))*0.11;
+	    return $red+$green+$blue/3;
+	}
+
+	public function get_gray_color($pixel){
+	    return ($pixel >> 16) & 0xFF;
 	}
 
 	public function RGBtoHSV($r, $g, $b) {
@@ -197,6 +215,7 @@ class UploadController extends Controller
 		
 		##APPLY GAUSSIAN BLUR IN IMAGE
 		imagefilter($starting_img,IMG_FILTER_GAUSSIAN_BLUR);
+		// imagefilter($starting_img,IMG_FILTER_EDGEDETECT);
 		 
 		##GET IMAGE SIZE (WIDTH AND HEIGHT)
 		$im_data = getimagesize($image_url);
@@ -251,6 +270,7 @@ class UploadController extends Controller
 		 
 		##CREATION OF THE FINAL IMAGE
 		imagejpeg($final,'query_images/'.$clean_file_name."_EDGESOBEL.".$file_extension);
+		// imagejpeg($starting_img,'query_images/'.$clean_file_name."_EDGEDETECT.".$file_extension);
 		 
 		##FREEING MEMORY
 		imagedestroy($starting_img);
@@ -258,36 +278,96 @@ class UploadController extends Controller
 	}
 
 	public function canny_edge_detection($image_url,$file_name,$file_extension,$clean_file_name){
+
 		$dimensions = getimagesize($image_url);
-		$w = $dimensions[0]; // width
-		$h = $dimensions[1]; // height
+		$width = $dimensions[0]; // width
+		$height = $dimensions[1]; // height
+		$temp_x = 0;
+		$temp_y = 0;
+
 		$im = imagecreatefromjpeg('query_images/'.$file_name);
+
 		imagefilter($im,IMG_FILTER_GAUSSIAN_BLUR);
-		for($hi=0; $hi < $h; $hi++) {
-			for($wi=0; $wi < $w; $wi++) {
-				$rgb = imagecolorat($im, $wi, $hi);
-				$r = ($rgb >> 16) & 0xFF;
-				$g = ($rgb >> 8) & 0xFF;
-				$b = $rgb & 0xFF;
-				$hsv = $this->RGBtoHSV($r, $g, $b);
-				if($hi < $h-1) {
-					// compare pixel below with current pixel
-					$brgb = imagecolorat($im, $wi, $hi+1);
-					$br = ($brgb >> 16) & 0xFF;
-					$bg = ($brgb >> 8) & 0xFF;
-					$bb = $brgb & 0xFF;
-					$bhsv = $this->RGBtoHSV($br, $bg, $bb);
-					// if difference in hue is bigger than 20, make this pixel white (edge), otherwise black
-					if($bhsv[2]-$hsv[2] > 20) {
-						imagesetpixel($im, $wi, $hi, imagecolorallocate($im, 255, 255, 255));
-					} else {
-						imagesetpixel($im, $wi, $hi, imagecolorallocate($im, 0, 0, 0));
-					}
-					
-				}
+
+		$edge_detect = imagecreatetruecolor($width, $height);
+
+		##CONVERT RGB IMAGE INTO GRAYCALE IMAGE
+		for($h = 0 ; $h < $height ; $h++){
+			for($w = 0 ; $w < $width ; $w++){
+				$rgb = imagecolorat($im,$w,$h);
+
+				$red   = ($rgb >> 16) & 0xFF;
+			    $green = ($rgb >> 8) & 0xFF;
+			    $blue  = $rgb & 0xFF;
+			    
+				$gray = round(($red + $green + $blue) / 3);
+
+				##INSERT GRAY COLOR PIXEL INTO ARRAY 2 DIMENSION
+				$grayscale_image[$h][$w] = $gray;
+
+				##SET PIXEL FOR THE NEW GRAYSCALE IMAGE
+				imagesetpixel($im, $w, $h, imagecolorallocate($im, $gray, $gray, $gray));
 			}
 		}
-		// header('Content-Type: image/jpeg');
+
+		imagejpeg($im,'query_images/'.$clean_file_name."_GRAYSCALE.".$file_extension);
+
+		##LOOPING THROUGH ALL PIXEL
+		for($x=1;$x<$width-1;$x++){
+		    for($y=1;$y<$height-1;$y++){
+		        ##GETTING GRAY VALUE OF ALL SURROUNDING PIXELS (ALL NEIGHBOUR)
+		        $pixel_up = $this->get_gray_color(imagecolorat($im,$x,$y-1));
+		        $pixel_down = $this->get_gray_color(imagecolorat($im,$x,$y+1)); 
+		        $pixel_left = $this->get_gray_color(imagecolorat($im,$x-1,$y));
+		        $pixel_right = $this->get_gray_color(imagecolorat($im,$x+1,$y));
+		        $pixel_up_left = $this->get_gray_color(imagecolorat($im,$x-1,$y-1));
+		        $pixel_up_right = $this->get_gray_color(imagecolorat($im,$x+1,$y-1));
+		        $pixel_down_left = $this->get_gray_color(imagecolorat($im,$x-1,$y+1));
+		        $pixel_down_right = $this->get_gray_color(imagecolorat($im,$x+1,$y+1));
+		        
+		        ##APPLYING CONVOLUTION MASK
+		        $conv_x = ($pixel_up_right+($pixel_right*2)+$pixel_down_right)-($pixel_up_left+($pixel_left*2)+$pixel_down_left);
+		        $conv_y = ($pixel_up_left+($pixel_up*2)+$pixel_up_right)-($pixel_down_left+($pixel_down*2)+$pixel_down_right);
+		        
+		        // calculating the distance
+		        $gray = sqrt($conv_x*$conv_x+$conv_y*$conv_y);
+		        // if(abs($conv_x) > $temp_x){
+		        // 	$temp_x = abs($conv_x);
+		        // }
+		        // if(abs($conv_y) > $temp_y){
+		        // 	$temp_y = abs($conv_y);
+		        // }
+		        // $arc_tan = atan($conv_y/$conv_x);
+
+		        ##APPLYING MANHATTAN DISTANCE
+		        // $gray = abs($conv_x)+abs($conv_y);
+		        
+
+		        // if($gray > 0){
+		        // 	$gray = 255;
+		        // }else{
+		        // 	$gray = 0;
+		        // }
+		        ##inverting the distance not to get the negative image                
+		        $gray = 255-$gray;
+		        
+		        ##adjusting distance if it's greater than 255 or less than zero (out of color range)
+		        if($gray > 255){
+		            $gray = 255;
+		        }
+		        if($gray < 0){
+		            $gray = 0;
+		        }
+		        
+		        ##creation of the new gray
+		        // $new_gray  = imagecolorallocate($edge_detect,$gray,$gray,$gray);
+		        
+		        ##ADDING / SET THE GRAY PIXEL TO THE NEW IMAGE
+		        imagesetpixel($edge_detect,$x,$y,imagecolorallocate($edge_detect,$gray,$gray,$gray));
+		    }
+		}
+
+
 
 		// ##GET IMAGE SIZE
 		// $dimensions = getimagesize($image_url);
@@ -300,30 +380,14 @@ class UploadController extends Controller
 		// ##INITIALIZE ARRAY
 		// $grayscale_image = Array();
 
-		// ##CONVERT RGB IMAGE INTO GRAYCALE IMAGE
-		// for($h = 0 ; $h < $height ; $h++){
-		// 	for($w = 0 ; $w < $width ; $w++){
-		// 		$rgb = imagecolorat($im,$w,$h);
-
-		// 		$red   = ($rgb >> 16) & 0xFF;
-		// 	    $green = ($rgb >> 8) & 0xFF;
-		// 	    $blue  = $rgb & 0xFF;
-			    
-		// 		$gray = round(($red + $green + $blue) / 3);
-
-		// 		##INSERT GRAY COLOR PIXEL INTO ARRAY 2 DIMENSION
-		// 		$grayscale_image[$h][$w] = $gray;
-
-		// 		##SET PIXEL FOR THE NEW GRAYSCALE IMAGE
-		// 		imagesetpixel($im, $w, $h, imagecolorallocate($im, $gray, $gray, $gray));
-		// 	}
-		// }
+		
 
 		##CREATION OF THE FINAL IMAGE
-		imagejpeg($im,'query_images/'.$clean_file_name."_EDGECANNY.".$file_extension);
+		imagejpeg($edge_detect,'query_images/'.$clean_file_name."_EDGECANNY.".$file_extension);
 
 		##FREEING MEMORY
 		imagedestroy($im);
+		imagedestroy($edge_detect);
 	}
 
 	public function glcm_image($image_url,$file_name,$file_extension,$clean_file_name,$destination_base_path){
@@ -390,7 +454,7 @@ class UploadController extends Controller
 			    $green = ($rgb >> 8) & 0xFF;
 			    $blue  = $rgb & 0xFF;
 			    
-				$gray = round(($red + $green + $blue) / 4);
+				$gray = round(($red + $green + $blue) / 3);
 
 				##INSERT GRAY COLOR PIXEL INTO ARRAY 2 DIMENSION
 				$original_image[$h][$w] = $gray;
@@ -596,9 +660,67 @@ class UploadController extends Controller
 		return $result;
 	}
 
+	public function local_color_histogram($image_url,$file_name,$file_extension,$clean_file_name,$destination_base_path){
+		$dimensions = getimagesize($image_url);
+		$width 		= $dimensions[0]; // width
+		$height 	= $dimensions[1]; // height
+
+		$im = imagecreatefromjpeg($destination_base_path.$file_name);
+
+		$image_size = 3; // 3x3
+		$width = floor($width/$image_size);
+		$height = floor($height/$image_size);
+
+		##INITIALIZE ARRAY
+
+		$histogram 				  = Array(); //$histogram[0-8 jd total ada 9 (3x3) gambar dibagi menjadi 3 row dan 3 column][0-3 jumlah histogram]
+		$histogram_ctr 			  = 0;
+
+		##QUANTIZATION of the RGB COLOR into X COLOR
+	    $quantization_size = 64;
+
+		$quantization = floor(255/$quantization_size); // 4 (0-3) color
+
+		for ($i=0; $i < $image_size; $i++) {
+			for ($j=0; $j < $image_size; $j++) { 
+				
+				##INITIALIZE HISTOGRAM ARRAY
+				for ($x=0; $x <= $quantization ; $x++) { 
+					for ($y=0; $y <= $quantization ; $y++) { 
+						for ($z=0; $z <= $quantization ; $z++) { 
+							$histogram[$histogram_ctr][$x][$y][$z] = 0;
+						}
+					}				
+				}
+
+				for($h = ($height*$i) ; $h < ($height*($i+1)) ; $h++){
+					for($w = ($width*$j) ; $w < ($width*($j+1)) ; $w++){
+						$rgb = imagecolorat($im,$w,$h);
+
+						$red   = ($rgb >> 16) & 0xFF;
+					    $green = ($rgb >> 8) & 0xFF;
+					    $blue  = $rgb & 0xFF;
+
+						$red_quantization   = floor($red/$quantization_size);
+						$green_quantization = floor($green/$quantization_size);
+						$blue_quantization  = floor($blue/$quantization_size);
+
+						//menambahkan data pada histogram ke $i
+						$histogram[$histogram_ctr][$red_quantization][$green_quantization][$blue_quantization] += 1;
+					}
+				}
+
+				$histogram_ctr += 1;
+			}
+		}
+
+		return $this->print_block($histogram);
+
+	}
+
 	public function print_block($data, $title="PRINT BLOCK") {
-        echo "<div style='margin:20px; padding:10px; border:1px solid #666; box-shadow:0px 0px 10px #ccc; border-radius:6px;'>";
-        echo "  <div style='padding:10px 5px; margin-bottom:10px; font-weight:bold; font-size:120%; border-bottom:1px solid #666'>".$title."</div>";
+        echo "<div style='margin:20px; padding:10px; border:1px solid #777; box-shadow:0px 0px 10px #ccc; border-radius:7px;'>";
+        echo "  <div style='padding:10px 5px; margin-bottom:10px; font-weight:bold; font-size:120%; border-bottom:1px solid #777'>".$title."</div>";
         if(is_array($data) OR is_object($data)) {
             echo "<pre>";
             print_r($data);
