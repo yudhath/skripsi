@@ -13,7 +13,19 @@ class UploadController extends Controller
 {
     public function upload(Request $request){
     	ini_set('max_execution_time', 300);
-
+    	$param = Input::get();
+    	$cbir_type = $param['cbir_type'];
+    	
+    	if($cbir_type == 1){
+    		$image_size_grid			= $param['image_size_grid']; // IMAGE SIZE FOR COLOR RETRIEVAL 3 x 3 / 5 x 5 / 7 x 7
+    		$image_color_quantization 	= $param['image_color_quantization'];
+    	}else if($cbir_type == 3){
+    		$image_size_grid			= $param['image_size_grid']; // IMAGE SIZE FOR COLOR RETRIEVAL 3 x 3 / 5 x 5 / 7 x 7
+    		$image_color_quantization 	= $param['image_color_quantization'];
+    		$color_weight 				= $param['color_weight'];
+    		$texture_weight 			= $param['texture_weight'];
+    	}
+    	
     	//upload image
     	if(Input::hasFile('file')){
 			if(Input::file('file')->isValid()){
@@ -30,7 +42,7 @@ class UploadController extends Controller
 					$file_extension = $file->getClientOriginalExtension();
 					$clean_file_name_temp = explode('.', $file_name);
 					$clean_file_name = $clean_file_name_temp[0];
-					$file_name = $clean_file_name.$date.$file_extension;
+					$file_name = $clean_file_name.$date.'.'.$file_extension;
 					$file->move('query_images', $file_name);
 					$image_url = URL('/query_images') . '/' . $file_name;
 
@@ -47,98 +59,149 @@ class UploadController extends Controller
 					// return $color_features = $this->local_color_histogram($image_url,$file_name,$file_extension,$clean_file_name,'query_images/');
 
 
-					## START GLCM
-					//
 					
-					$texture_features = $this->glcm_image($image_url,$file_name,$file_extension,$clean_file_name,'query_images/');
 					$id_image_query = DB::table('image_query')->insertGetId(['image_path' => 'query_images/'.$file_name]);
-					DB::table('image_query_texture')->insert([
-							'id_image_query' => $id_image_query,
-						    'energy' 		 => $texture_features['energy'],
-						    'correlation' 	 => $texture_features['correlation'],
-						    'idm' 			 => $texture_features['idm'],
-						    'contrast' 		 => $texture_features['contrast']
-							]
-						);
+					
+					if($cbir_type == 1 || $cbir_type == 3){
+						##START COLOR HISTOGRAM
+						//
+						$histogram_query = $this->local_color_histogram($image_url,$file_name,$file_extension,$clean_file_name,'query_images/',$image_size_grid,$image_color_quantization);
 
-					$image_query_texture = DB::select('select image_query_texture.* from image_query_texture
-														JOIN image_query ON image_query.id = image_query_texture.id_image_query
-														WHERE image_query_texture.id_image_query = '.$id_image_query);
-					$image_data_texture = DB::select('select * from image_data_texture');
+						$image_data = DB::select('select * from image_data');
+						foreach ($image_data as $value) {
+							if($value->id > 0){
+								$image_data_file_path = $value->image_path;
+								$image_data_array_dot = explode('.', $image_data_file_path);
+								$image_data_array_slash = explode('/', $image_data_file_path);
+								$image_data_file_name = $image_data_array_slash[2];
+								$image_data_clean_file_name_temp = explode('.',$image_data_file_name);
+								$image_data_file_extension = $image_data_array_dot[1];
+								$image_data_clean_file_name = $image_data_clean_file_name_temp[0];
+								$image_data_url = URL('/query_images/database_image'). '/' . $image_data_file_name;
 
-					foreach ($image_data_texture as $value) {
-						foreach ($image_query_texture as $value2) {
-							$euclidean_distance = sqrt (pow(($value2->energy - $value->energy),2) +
-												  pow(($value2->correlation - $value->correlation),2) +
-												  pow(($value2->idm - $value->idm),2) +
-												  pow(($value2->contrast - $value->contrast),2) );
-							$euclidean_distance = round($euclidean_distance,4);
+								$euclidean_distance = $this->local_color_histogram_distance($image_data_url,$image_data_file_name,$image_data_file_extension,$image_data_clean_file_name,'query_images/database_image/',$histogram_query,$image_size_grid,$image_color_quantization);
 
-							DB::table('image_texture_distance')->insert([
-								'id_image_query'	 => $value2->id_image_query,
-							    'id_image_data' 	 => $value->id_image_data,
-							    'euclidean_distance' => $euclidean_distance
-								]
-							);
+								DB::table('image_color_distance')->insert([
+									'id_image_query'	 => $id_image_query,
+								    'id_image_data' 	 => $value->id,
+								    'euclidean_distance' => $euclidean_distance
+									]
+								);
+							}
 						}
+
+						# QUERY RESULT FOR COLOR RETRIEVAL
+						// $result_arr = DB::select('SELECT id.image_path
+						// 					FROM image_color_distance icd
+						// 					JOIN image_data id ON id.id = icd.id_image_data
+						// 					JOIN image_query iq ON iq.id = icd.id_image_query
+						// 					WHERE icd.id_image_query = '.$id_image_query.'
+						// 					ORDER BY euclidean_distance ASC
+						// 					LIMIT 10');
 						
+						// return view('result',[
+						// 	'result' => $result_arr
+						// ]);
+
+						//
+						##END COLOR HISTOGRAM
 					}
 
-					$result_arr = DB::select('SELECT id.image_path, itd.euclidean_distance
-										FROM image_texture_distance itd
-										JOIN image_data id ON id.id = itd.id_image_data
-										JOIN image_query iq ON iq.id = itd.id_image_query
-										WHERE itd.id_image_query = '.$id_image_query.'
-										ORDER BY euclidean_distance ASC
-										LIMIT 10');
+					if($cbir_type == 2 || $cbir_type == 3){
+						##START GLCM AREA
+						//
+						$texture_features = $this->glcm_image($image_url,$file_name,$file_extension,$clean_file_name,'query_images/');
+						DB::table('image_query_texture')->insert([
+								'id_image_query' => $id_image_query,
+							    'energy' 		 => $texture_features['energy'],
+							    'correlation' 	 => $texture_features['correlation'],
+							    'idm' 			 => $texture_features['idm'],
+							    'contrast' 		 => $texture_features['contrast']
+								]
+							);
+
+						$image_query_texture = DB::select('select image_query_texture.* from image_query_texture
+															JOIN image_query ON image_query.id = image_query_texture.id_image_query
+															WHERE image_query_texture.id_image_query = '.$id_image_query);
+						$image_data_texture = DB::select('select * from image_data_texture');
+
+						foreach ($image_data_texture as $value) {
+							foreach ($image_query_texture as $value2) {
+								$euclidean_distance = sqrt (pow(($value2->energy - $value->energy),2) +
+													  pow(($value2->correlation - $value->correlation),2) +
+													  pow(($value2->idm - $value->idm),2) +
+													  pow(($value2->contrast - $value->contrast),2) );
+								$euclidean_distance = round($euclidean_distance,4);
+
+								DB::table('image_texture_distance')->insert([
+									'id_image_query'	 => $value2->id_image_query,
+								    'id_image_data' 	 => $value->id_image_data,
+								    'euclidean_distance' => $euclidean_distance
+									]
+								);
+							}
+							
+						}
+
+						# QUERY RESULT FOR TEXTURE RETRIEVAL
+						// $result_arr = DB::select('SELECT id.image_path
+						// 					FROM image_texture_distance itd
+						// 					JOIN image_data id ON id.id = itd.id_image_data
+						// 					JOIN image_query iq ON iq.id = itd.id_image_query
+						// 					WHERE itd.id_image_query = '.$id_image_query.'
+						// 					ORDER BY euclidean_distance ASC
+						// 					LIMIT 10');
+						
+						// return view('result',[
+						// 	'result' => $result_arr
+						// ]);
+
+						//
+						##END GLCM AREA
+					}
 					
+					
+					
+
+					if($cbir_type == 1){
+
+						# QUERY RESULT FOR COLOR RETRIEVAL
+						$result_arr = DB::select('SELECT id.image_path
+											FROM image_color_distance icd
+											JOIN image_data id ON id.id = icd.id_image_data
+											JOIN image_query iq ON iq.id = icd.id_image_query
+											WHERE icd.id_image_query = '.$id_image_query.'
+											ORDER BY euclidean_distance ASC
+											LIMIT 10');
+
+					}else if($cbir_type == 2){
+
+						# QUERY RESULT FOR TEXTURE RETRIEVAL
+						$result_arr = DB::select('SELECT id.image_path
+											FROM image_texture_distance itd
+											JOIN image_data id ON id.id = itd.id_image_data
+											JOIN image_query iq ON iq.id = itd.id_image_query
+											WHERE itd.id_image_query = '.$id_image_query.'
+											ORDER BY euclidean_distance ASC
+											LIMIT 10');
+
+					}else if($cbir_type == 3){
+
+						$result_arr = DB::select('SELECT DISTINCT id.image_path, (('.($color_weight/100).'*icd.euclidean_distance)+('.($texture_weight/100).'*itd.euclidean_distance)) Euclidean_Distance
+										FROM image_color_distance icd
+										JOIN image_data id ON id.id = icd.id_image_data
+										JOIN image_query iq ON iq.id = icd.id_image_query
+										JOIN image_texture_distance itd ON itd.id_image_data = icd.id_image_data
+										WHERE icd.id_image_query = '.$id_image_query.' AND itd.id_image_query = '.$id_image_query.'
+										ORDER BY 2 ASC
+										LIMIT 10');
+
+					}
+					
+
 					return view('result',[
 						'result' => $result_arr
 					]);
-					//
-					## INSERT DATABASE TRAINING IMAGE
-					// for ($i=1; $i <= 250; $i++) { 
-					// 	DB::table('image_data')->insert([
-					// 		'id' => $i,
-					// 		'image_path' => 'query_images/database_image/'.$i.'.jpg'
-					// 	]);
-					// }
-
-					## EXTRACT TEXTURE FEATURE TRAINING IMAGE
-					
-					// $image_data = DB::select('select * from image_data');
-					// foreach ($image_data as $value) {
-					// 	if($value->id > 0){
-					// 		$image_data_file_path = $value->image_path;
-					// 		$image_data_array_dot = explode('.', $image_data_file_path);
-					// 		$image_data_array_slash = explode('/', $image_data_file_path);
-					// 		$image_data_file_name = $image_data_array_slash[2];
-					// 		$image_data_clean_file_name_temp = explode('.',$image_data_file_name);
-					// 		$image_data_file_extension = $image_data_array_dot[1];
-					// 		$image_data_clean_file_name = $image_data_clean_file_name_temp[0];
-					// 		$image_data_url = URL('/query_images/database_image'). '/' . $image_data_file_name;
-							
-							
-					// 		$texture_features = $this->glcm_image($image_data_url,$image_data_file_name,$image_data_file_extension,$image_data_clean_file_name,'query_images/database_image/');
-
-					// 		DB::table('image_data_texture')->insert([
-					// 			'id_image_data' => $value->id,
-					// 		    'energy' 		=> $texture_features['energy'],
-					// 		    'correlation' 	=> $texture_features['correlation'],
-					// 		    'idm' 			=> $texture_features['idm'],
-					// 		    'contrast' 		=> $texture_features['contrast']
-					// 			]
-					// 		);
-					// 	}
-						
-					// }
-					
-					## END GLCM
-
-					## START EDGE DETECTION
-
-					## END EDGE DETECTION
-
 
 					return redirect()->back()->with('success', ['Image have been uploaded']);
 				}
@@ -147,6 +210,49 @@ class UploadController extends Controller
 		else{
 			return redirect()->back()->with('error', ['There is no image']);
 		}
+    }
+
+    public function data_training_texture(){
+    	## START GLCM DATA TRAINING
+
+		# INSERT DATABASE TRAINING IMAGE
+		// for ($i=1; $i <= 250; $i++) { 
+		// 	DB::table('image_data')->insert([
+		// 		'id' => $i,
+		// 		'image_path' => 'query_images/database_image/'.$i.'.jpg'
+		// 	]);
+		// }
+
+		# EXTRACT TEXTURE FEATURE TRAINING IMAGE
+		
+		$image_data = DB::select('select * from image_data');
+		foreach ($image_data as $value) {
+			if($value->id > 0){
+				$image_data_file_path = $value->image_path;
+				$image_data_array_dot = explode('.', $image_data_file_path);
+				$image_data_array_slash = explode('/', $image_data_file_path);
+				$image_data_file_name = $image_data_array_slash[2];
+				$image_data_clean_file_name_temp = explode('.',$image_data_file_name);
+				$image_data_file_extension = $image_data_array_dot[1];
+				$image_data_clean_file_name = $image_data_clean_file_name_temp[0];
+				$image_data_url = URL('/query_images/database_image'). '/' . $image_data_file_name;
+				
+				
+				$texture_features = $this->glcm_image($image_data_url,$image_data_file_name,$image_data_file_extension,$image_data_clean_file_name,'query_images/database_image/');
+
+				DB::table('image_data_texture')->insert([
+					'id_image_data' => $value->id,
+				    'energy' 		=> $texture_features['energy'],
+				    'correlation' 	=> $texture_features['correlation'],
+				    'idm' 			=> $texture_features['idm'],
+				    'contrast' 		=> $texture_features['contrast']
+					]
+				);
+			}
+			
+		}
+		
+		## END GLCM DATA TRAINING
     }
 
     // function to get the luminance value (intensitas warna)
@@ -660,14 +766,14 @@ class UploadController extends Controller
 		return $result;
 	}
 
-	public function local_color_histogram($image_url,$file_name,$file_extension,$clean_file_name,$destination_base_path){
+	public function local_color_histogram($image_url,$file_name,$file_extension,$clean_file_name,$destination_base_path,$image_size_grid,$image_color_quantization){
 		$dimensions = getimagesize($image_url);
 		$width 		= $dimensions[0]; // width
 		$height 	= $dimensions[1]; // height
 
 		$im = imagecreatefromjpeg($destination_base_path.$file_name);
 
-		$image_size = 3; // 3x3
+		$image_size = $image_size_grid; // 3x3
 		$width = floor($width/$image_size);
 		$height = floor($height/$image_size);
 
@@ -677,7 +783,7 @@ class UploadController extends Controller
 		$histogram_ctr 			  = 0;
 
 		##QUANTIZATION of the RGB COLOR into X COLOR
-	    $quantization_size = 64;
+	    $quantization_size = $image_color_quantization;
 
 		$quantization = floor(255/$quantization_size); // 4 (0-3) color
 
@@ -714,8 +820,56 @@ class UploadController extends Controller
 			}
 		}
 
-		return $this->print_block($histogram);
+		##FREEING MEMORY
+		imagedestroy($im);
 
+		return $histogram;
+		// return $this->print_block($histogram);
+	}
+
+	public function local_color_histogram_distance($image_url,$file_name,$file_extension,$clean_file_name,$destination_base_path,$histogram_query,$image_size_grid,$image_color_quantization){
+		$histogram_data = $this->local_color_histogram($image_url,$file_name,$file_extension,$clean_file_name,$destination_base_path,$image_size_grid,$image_color_quantization);
+
+		$dimensions = getimagesize($image_url);
+		$width 		= $dimensions[0]; // width
+		$height 	= $dimensions[1]; // height
+
+		$image_size = $image_size_grid; // 3 x 3 OR 5 x 5 OR 7 x 7
+		$width = floor($width/$image_size);
+		$height = floor($height/$image_size);
+
+		##INITIALIZE ARRAY
+
+		$histogram_ctr 			  = 0;
+		$histogram_distance_final = 0;
+
+		##QUANTIZATION of the RGB COLOR into X COLOR
+	    $quantization_size = $image_color_quantization;
+
+		$quantization = floor(255/$quantization_size); // 4 (0-3) color
+
+		for ($i=0; $i < $image_size; $i++) {
+			for ($j=0; $j < $image_size; $j++) { 
+				$histogram_distance[$histogram_ctr] = 0;
+
+				##INITIALIZE HISTOGRAM ARRAY
+				for ($x=0; $x <= $quantization ; $x++) { 
+					for ($y=0; $y <= $quantization ; $y++) { 
+						for ($z=0; $z <= $quantization ; $z++) { 
+							$histogram_distance[$histogram_ctr] += pow(($histogram_query[$histogram_ctr][$x][$y][$z]-$histogram_data[$histogram_ctr][$x][$y][$z]),2);
+						}
+					}				
+				}
+
+				$histogram_distance[$histogram_ctr] = sqrt($histogram_distance[$histogram_ctr]);
+				$histogram_distance_final += $histogram_distance[$histogram_ctr];
+
+				$histogram_ctr += 1;
+			}
+		}
+
+		return $histogram_distance_final;
+		
 	}
 
 	public function print_block($data, $title="PRINT BLOCK") {
