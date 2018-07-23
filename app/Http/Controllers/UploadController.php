@@ -187,7 +187,7 @@ class UploadController extends Controller
 
 					}else if($cbir_type == 3){
 
-						$result_arr = DB::select('SELECT DISTINCT id.image_path, (('.($color_weight/100).'*icd.euclidean_distance)+('.($texture_weight/100).'*itd.euclidean_distance)) Euclidean_Distance
+						$result_arr = DB::select('SELECT DISTINCT id.image_path, (('.($color_weight/100).'*(icd.euclidean_distance/(SELECT MAX(euclidean_distance) FROM image_color_distance where id_image_query = '.$id_image_query.')))+('.($texture_weight/100).'*(itd.euclidean_distance/(SELECT MAX(euclidean_distance) FROM image_texture_distance where id_image_query = '.$id_image_query.')))) Euclidean_Distance
 										FROM image_color_distance icd
 										JOIN image_data id ON id.id = icd.id_image_data
 										JOIN image_query iq ON iq.id = icd.id_image_query
