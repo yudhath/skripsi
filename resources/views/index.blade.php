@@ -1,85 +1,120 @@
-<!DOCTYPE html>
-<html>
-<head>
-	<title></title>
-	<link rel="stylesheet" type="text/css" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
-	<script type="text/javascript" src="{{URL('/')}}/js/jquery.js"></script>
-</head>
-<body>
-	@php
-		function print_block($data, $title="PRINT BLOCK") {
-	        echo "<div style='margin:20px; padding:10px; border:1px solid #777; box-shadow:0px 0px 10px #ccc; border-radius:7px;'>";
-	        echo "  <div style='padding:10px 5px; margin-bottom:10px; font-weight:bold; font-size:120%; border-bottom:1px solid #777'>".$title."</div>";
-	        if(is_array($data) OR is_object($data)) {
-	            echo "<pre>";
-	            print_r($data);
-	            echo "</pre>";
-	        } else {
-	            echo $data;
-	        }
-	        echo "</div>";
-	    }
-    @endphp
-	<div class="container">
-		<div class="content">
-			<h1>CBIR - Local Color Histogram & GLCM</h1>
-			@if (Session::has('success'))
-			    <div class="alert alert-success">
-			        <ul>
-			            <li>{!! Session::get('success')[0] !!}</li>
-			        </ul>
-			    </div>
-		    @elseif(Session::has('error'))
-			    <div class="alert alert-danger">
-			        <ul>
-			            <li>{!! Session::get('error')[0] !!}</li>
-			        </ul>
-			    </div>
-			@endif
-			<form action="{{ URL::to('upload') }}" method="post" enctype="multipart/form-data">
-				<label>Choose CBIR Type :</label>
-				<select name="cbir_type">
-					<option value="1">Color</option>
-					<option value="2">Texture</option>
-					<option value="3">Color & Texture</option>
-				</select>
-				<br>
-				<div id="image_section">
-					<label>Choose Image Size :</label>
-					<select name="image_size_grid">
-						<option value="3">3 x 3</option>
-						<option value="5">5 x 5</option>
-						<option value="7">7 x 7</option>
-					</select>
-					<br>
-					<label>Choose Image Color Quantization :</label>
-					<select name="image_color_quantization">
-						<option value="32">32</option>
-						<option value="64">64</option>
-						<option value="128">128</option>
-					</select>
+@extends('layouts.master')
+@php
+	function print_block($data, $title="PRINT BLOCK") {
+        echo "<div style='margin:20px; padding:10px; border:1px solid #777; box-shadow:0px 0px 10px #ccc; border-radius:7px;'>";
+        echo "  <div style='padding:10px 5px; margin-bottom:10px; font-weight:bold; font-size:120%; border-bottom:1px solid #777'>".$title."</div>";
+        if(is_array($data) OR is_object($data)) {
+            echo "<pre>";
+            print_r($data);
+            echo "</pre>";
+        } else {
+            echo $data;
+        }
+        echo "</div>";
+    }
+@endphp
+
+@section('content')
+	<div class="container-contact100">
+		<div class="wrap-contact100">
+			<form class="contact100-form validate-form" action="{{ URL::to('upload') }}" method="post" enctype="multipart/form-data">
+			
+				<span class="contact100-form-title">
+					CBIR - Local Color Histogram & GLCM
+				</span>
+				@if (Session::has('success'))
+				    <div class="alert alert-success">
+				        <ul>
+				            <li>{!! Session::get('success')[0] !!}</li>
+				        </ul>
+				    </div>
+			    @elseif(Session::has('error'))
+				    <div class="alert alert-danger">
+				        <ul>
+				            <li>{!! Session::get('error')[0] !!}</li>
+				        </ul>
+				    </div>
+				@endif
+
+				
+				<div class="wrap-input100 input100-select bg1">
+					<span class="label-input100">Choose CBIR Type :</span>
+					<div>
+						<select class="js-select2" name="cbir_type">
+							<option value="1">Color</option>
+							<option value="2">Texture</option>
+							<option value="3">Color & Texture</option>
+						</select>
+						<div class="dropDownSelect2"></div>
+					</div>
+				</div>
+				<div class="wrap-input100 bg1 rs1-wrap-input100" id="image_section">
+					<div class="wrap-input100 input100-select bg1">
+						<span class="label-input100">Choose Image Size :</span>
+						<div>
+							<select class="js-select2" name="image_size_grid">
+								<option value="3">3 x 3</option>
+								<option value="5">5 x 5</option>
+								<option value="7">7 x 7</option>
+							</select>
+							<div class="dropDownSelect2"></div>
+						</div>
+					</div>
+					<div class="wrap-input100 input100-select bg1">
+						<span class="label-input100">Choose Image Color Quantization :</span>
+						<div>
+							<select class="js-select2" name="image_color_quantization">
+								<option value="32">32</option>
+								<option value="64">64</option>
+								<option value="128">128</option>
+							</select>
+							<div class="dropDownSelect2"></div>
+						</div>
+					</div>
 				</div>
 
-				<div id="weight_section">
-					<label>Weight :</label>
-					<br>
-					<label>Color : </label>
-					<input type="number" name="color_weight" value="100">
-					<label><strong>%</strong></label>
-					<br>
-					<label>Texture : </label>
-					<input type="number" name="texture_weight" value="0">
-					<label><strong>%</strong></label>
+				<div class="wrap-input100 bg1 rs1-wrap-input100" id="weight_section">
+					<div class="wrap-input100 bg1 rs1-wrap-input100">
+						<span class="label-input100">Color Weight :</span>
+						<input class="input100" type="number" name="color_weight" value="100">
+					</div>
+
+					<div class="wrap-input100 bg1 rs1-wrap-input100">
+						<span class="label-input100">Texture Weight :</span>
+						<input class="input100" type="number" name="texture_weight" value="0">
+					</div>
 				</div>
 
-				<label>Select image to upload :</label>
-			    <input type="file" name="file" id="file">
-			    <input type="submit" value="Upload" name="submit">
+				<div class="wrap-input100 bg1 rs1-wrap-input100">
+					<span class="label-input100">Select image to upload :</span>
+					<input class="input100" type="file" name="file" id="file">
+				</div>
+			    
+			    <div class="container-contact100-form-btn">
+					<button class="contact100-form-btn">
+						<span>
+							Upload
+							<i class="fa fa-long-arrow-right m-l-7" aria-hidden="true"></i>
+						</span>
+					</button>
+				</div>
 				<input type="hidden" value="{{ csrf_token() }}" name="_token">
+				
 			</form>
 		</div>
+		<div class="container-contact100-form-btn">
+			<a href="{{ URL('/') }}/about-us">
+				<span>
+					<i class="fa fa-user m-l-7" aria-hidden="true"></i>
+					ABOUT US
+				</span>
+			</a>
+		</div>
 	</div>
+	
+@endsection
 
+@section('js_footer')
 	<script type="text/javascript">
 		$(document).ready(function(){
 			var cbir_type = $("select[name='cbir_type']").val();
@@ -144,5 +179,4 @@
 			
 		});
 	</script>
-</body>
-</html>
+@endsection
