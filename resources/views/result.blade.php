@@ -21,7 +21,7 @@
 </style>
 <div class="container-contact100">
 	<div class="wrap-contact100">
-		<form class="contact100-form" action="{{ URL('/') }}">
+		<div class="contact100-form">
 			<span class="contact100-form-title">
 				CBIR Result
 			</span>
@@ -43,14 +43,26 @@
 			</div>
 
 			<div class="container-contact100-form-btn">
-				<button class="contact100-form-btn">
+				<button class="contact100-form-btn" id="btn-home">
 					<span>
 						Back to Home
 						<i class="fa fa-long-arrow-left m-l-7" aria-hidden="true"></i>
 					</span>
 				</button>
 			</div>
-		</form>
+		</div>
 	</div>
 </div>
+@endsection
+
+@section('js_footer')
+
+<script type="text/javascript">
+	$(document).ready(function(){
+		$("#btn-home").on('click',function(e){
+			window.location = "{{ URL('/') }}";
+		});
+	})
+</script>
+
 @endsection
