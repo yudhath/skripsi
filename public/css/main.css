@@ -321,7 +321,7 @@ textarea.input100 {
 }
 
 .contact100-form-btn:hover {
-  background-color: #00ad5f;
+  background-color: #593111;
 }
 
 .contact100-form-btn:hover i {
@@ -411,7 +411,7 @@ textarea.input100 {
   content: "\f26b";
   font-family: Material-Design-Iconic-Font;
   font-size: 18px;
-  color: #00ad5f;
+  color: #593111;
   display: -webkit-box;
   display: -webkit-flex;
   display: -moz-box;
@@ -540,12 +540,12 @@ textarea.input100 {
 }
 
 .select2-container .select2-results__option[aria-selected="true"] {
-  background: #00ad5f;
+  background: #593111;
   color: white;
 }
 
 .select2-container .select2-results__option--highlighted[aria-selected] {
-  background: #00ad5f;
+  background: #593111;
   color: white;
 }
 
@@ -625,7 +625,7 @@ textarea.input100 {
   height: 20px;
   border-radius: 50%;
   border: 6px solid transparent;
-  background: #00ad5f;
+  background: #593111;
   -moz-background-clip: padding;     
   -webkit-background-clip: padding;  
   background-clip: padding-box; 
@@ -674,7 +674,7 @@ textarea.input100 {
 #filter-bar .noUi-connect {
   border: 1px solid #e6e6e6;
   border-radius: 9px;
-  background-color: #00ad5f;
+  background-color: #593111;
   box-shadow: none;
 }
 #filter-bar .noUi-handle {

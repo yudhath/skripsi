@@ -53,9 +53,9 @@
 						<span class="label-input100">Choose Image Size :</span>
 						<div>
 							<select class="js-select2" name="image_size_grid">
-								<option value="3">3 x 3</option>
-								<option value="5">5 x 5</option>
-								<option value="7">7 x 7</option>
+								<option value="4">4 x 4</option>
+								<option value="6">6 x 6</option>
+								<option value="8">8 x 8</option>
 							</select>
 							<div class="dropDownSelect2"></div>
 						</div>
@@ -88,6 +88,7 @@
 				<div class="wrap-input100 bg1 rs1-wrap-input100">
 					<span class="label-input100">Select image to upload :</span>
 					<input class="input100" type="file" name="file" id="file">
+					<span id="imgPrevDiv"></span>
 				</div>
 			    
 			    <div class="container-contact100-form-btn">
@@ -174,6 +175,27 @@
 					$("input[name='color_weight']").val(100-texture_weight);
 					$("input[name='texture_weight']").val(texture_weight);
 				}
+			});
+
+			function readURL(input) {
+			    if (input.files && input.files[0]) {
+			        var reader = new FileReader();
+
+			        reader.onload = function (e) {
+			            $('#imgPrev').attr('src', e.target.result);
+			        }
+
+			        if(input.files[0] != ""){
+			        	$("#imgPrevDiv").html('<img class="wrap-input100" src="#" id="imgPrev" alt="Query Image">');
+			        }else{
+			        	$("#imgPrevDiv").html('<span></span>');
+			        }
+			        reader.readAsDataURL(input.files[0]);
+			    }
+			}
+
+			$("#file").change(function(){
+			    readURL(this);
 			});
 
 			
