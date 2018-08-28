@@ -74,14 +74,14 @@
 				</div>
 
 				<div class="wrap-input100 bg1 rs1-wrap-input100" id="weight_section">
-					<div class="wrap-input100 bg1 rs1-wrap-input100">
+					<div class="wrap-input100 bg1">
 						<span class="label-input100">Color Weight :</span>
-						<input class="input100" type="number" name="color_weight" value="100">
+						<span><input class="input100" type="number" name="color_weight" value="100">%</span>
 					</div>
 
-					<div class="wrap-input100 bg1 rs1-wrap-input100">
+					<div class="wrap-input100 bg1">
 						<span class="label-input100">Texture Weight :</span>
-						<input class="input100" type="number" name="texture_weight" value="0">
+						<span><input class="input100" type="number" name="texture_weight" value="0">%</span>
 					</div>
 				</div>
 

@@ -241,8 +241,8 @@ iframe {
 }
 
 .input100 {
-  display: block;
-  width: 100%;
+  /*display: block;*/
+  /*width: 100%;*/
   background: transparent;
   font-family: Montserrat-SemiBold;
   font-size: 18px;

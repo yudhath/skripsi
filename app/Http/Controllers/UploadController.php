@@ -17,10 +17,10 @@ class UploadController extends Controller
     	$cbir_type = $param['cbir_type'];
     	
     	if($cbir_type == 1){
-    		$image_size_grid			= $param['image_size_grid']; // IMAGE SIZE FOR COLOR RETRIEVAL 3 x 3 / 5 x 5 / 7 x 7
+    		$image_size_grid			= $param['image_size_grid']; // IMAGE SIZE FOR COLOR RETRIEVAL 4 x 4 / 6 x 6 / 8 x 8
     		$image_color_quantization 	= $param['image_color_quantization'];
     	}else if($cbir_type == 3){
-    		$image_size_grid			= $param['image_size_grid']; // IMAGE SIZE FOR COLOR RETRIEVAL 3 x 3 / 5 x 5 / 7 x 7
+    		$image_size_grid			= $param['image_size_grid']; // IMAGE SIZE FOR COLOR RETRIEVAL 4 x 4 / 6 x 6 / 8 x 8
     		$image_color_quantization 	= $param['image_color_quantization'];
     		$color_weight 				= $param['color_weight'];
     		$texture_weight 			= $param['texture_weight'];
